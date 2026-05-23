@@ -18,6 +18,8 @@ param(
     [switch]$ConfigureWindowsLAPS,
     [switch]$ExtendLAPSSchema,
     [string]$LAPSManagedOU,
+    [switch]$EnableCISHardening,
+    [switch]$EnableBlueTeamMode,
     [switch]$GenerateHtmlReport,
     [switch]$Menu
 )
@@ -36,6 +38,7 @@ Import-Module "$PSScriptRoot\modules\gpo_setup.psm1" -Force
 Import-Module "$PSScriptRoot\modules\access_control.psm1" -Force
 Import-Module "$PSScriptRoot\modules\security_monitoring.psm1" -Force
 Import-Module "$PSScriptRoot\modules\laps.psm1" -Force
+Import-Module "$PSScriptRoot\modules\security_hardening.psm1" -Force
 Import-Module "$PSScriptRoot\modules\reporting.psm1" -Force
 
 function Write-Status {
@@ -83,8 +86,10 @@ function Show-ADAutoDeploymentMenu {
     Write-Host '3. Configure Department Access Control'
     Write-Host '4. Configure Security Monitoring'
     Write-Host '5. Configure Windows LAPS'
-    Write-Host '6. Generate HTML Report'
-    Write-Host '7. Exit'
+    Write-Host '6. Enable CIS-style Security Hardening'
+    Write-Host '7. Enable Blue Team Mode'
+    Write-Host '8. Generate HTML Security Report'
+    Write-Host '9. Exit'
     Write-Host ''
 
     return Read-Host 'Select an option'
@@ -137,8 +142,10 @@ try {
             '3' { $ConfigureDepartmentAccessControl = $true }
             '4' { $ConfigureSecurityMonitoring = $true }
             '5' { $ConfigureWindowsLAPS = $true }
-            '6' { $GenerateHtmlReport = $true }
-            '7' {
+            '6' { $EnableCISHardening = $true }
+            '7' { $EnableBlueTeamMode = $true }
+            '8' { $GenerateHtmlReport = $true }
+            '9' {
                 Write-Status 'Menu exit selected.' -Level Warning
                 return
             }
@@ -243,6 +250,48 @@ try {
         return
     }
 
+    if ($EnableCISHardening) {
+        Enable-ADLabCISHardening `
+            -DomainName $DomainName `
+            -NetBIOSName $NetBIOSName `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Write-Status 'CIS-style Security Hardening completed.' -Level Success
+        return
+    }
+
+    if ($EnableBlueTeamMode) {
+        $collectorFqdn = if ([string]::IsNullOrWhiteSpace($SecurityMonitoringCollector)) {
+            Read-Host 'Enter Windows Event Forwarding collector FQDN, example dc01.lab.local'
+        } else {
+            $SecurityMonitoringCollector
+        }
+
+        if ([string]::IsNullOrWhiteSpace($collectorFqdn)) {
+            throw 'Windows Event Forwarding collector FQDN is required for Blue Team Mode.'
+        }
+
+        $targetLapsOu = if ([string]::IsNullOrWhiteSpace($LAPSManagedOU)) {
+            $script:ADSetupConfig.LAPSManagedOU
+        } else {
+            $LAPSManagedOU
+        }
+
+        Enable-ADLabBlueTeamMode `
+            -DomainName $DomainName `
+            -NetBIOSName $NetBIOSName `
+            -CollectorFqdn $collectorFqdn `
+            -SysmonStubPath $script:ADSetupConfig.SysmonStubPath `
+            -LAPSManagedOU $targetLapsOu `
+            -ExtendLAPSSchema:$ExtendLAPSSchema `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Write-Status 'Blue Team Mode completed.' -Level Success
+        return
+    }
+
     if ($GenerateHtmlReport) {
         New-ADLabHtmlReport `
             -DomainName $DomainName `
@@ -253,7 +302,7 @@ try {
             -LogPath $script:ADSetupConfig.LogPath `
             -WhatIf:$WhatIfPreference
 
-        Write-Status 'HTML Health and Security Report generation completed.' -Level Success
+        Write-Status 'HTML Security Dashboard generation completed.' -Level Success
         return
     }
 

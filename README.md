@@ -29,9 +29,11 @@ Replace the placeholder with the final public or private repository URL when the
 - `modules/access_control.psm1` - creates department share folders, hidden SMB shares, and access rules.
 - `modules/security_monitoring.psm1` - prepares audit policy, Windows Event Forwarding, and Sysmon deployment stubs.
 - `modules/laps.psm1` - prepares optional Windows LAPS schema checks, policy settings, and delegation.
+- `modules/security_hardening.psm1` - prepares CIS-style hardening and Blue Team Mode orchestration.
 - `modules/reporting.psm1` - generates an optional HTML Health and Security Report.
 - `modules/checks.psm1` - admin checks, AD detection, password validation, logging, and health report.
 - `data/users.csv` - sample user import file.
+- `.github/workflows/powershell-validation.yml` - GitHub Actions parser and module import validation.
 
 ## What It Does
 
@@ -51,7 +53,9 @@ Active Directory Auto Deployment Lab can:
 - Configure Department-Based Access Control with department folders, hidden SMB shares, NTFS permissions, and SMB permissions.
 - Configure optional security monitoring with an audit policy GPO, Windows Event Forwarding preparation, and a Sysmon deployment stub.
 - Configure optional Windows LAPS policy settings and delegation for lab-managed computers.
-- Generate an optional HTML Health and Security Report.
+- Configure optional CIS-style security hardening.
+- Enable optional Blue Team Mode to orchestrate monitoring, Sysmon stub preparation, hardening, and LAPS.
+- Generate an optional HTML Security Dashboard.
 - Run health checks and generate a report.
 - Log actions to `C:\AD_Setup\Logs\setup.log`.
 - Write the final report to `C:\AD_Setup\Reports\final-report.txt`.
@@ -135,6 +139,8 @@ Notes:
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureSecurityMonitoring -SecurityMonitoringCollector dc01.lab.local
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS -LAPSManagedOU Computers
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -EnableCISHardening
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -EnableBlueTeamMode -SecurityMonitoringCollector dc01.lab.local
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -GenerateHtmlReport
 .\main.ps1 -Menu
 ```
@@ -290,9 +296,60 @@ Schema extension is intentionally not automatic unless requested:
 
 Review schema extension requirements before using `-ExtendLAPSSchema`. In a lab, use VM snapshots/checkpoints before changing the schema.
 
-## HTML Health and Security Report
+## CIS-Style Security Hardening
 
-Active Directory Auto Deployment Lab can generate an HTML report that summarizes the current lab state.
+Active Directory Auto Deployment Lab can prepare an optional CIS-style hardening baseline for lab systems.
+
+Run it directly:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -EnableCISHardening
+```
+
+Or open the menu and choose `Enable CIS-style Security Hardening`:
+
+```powershell
+.\main.ps1 -Menu
+```
+
+The hardening module prepares code logic and GPO settings for:
+
+- SMB signing hardening.
+- NTLM restriction notes and settings.
+- Windows Defender baseline settings.
+- Firewall baseline settings.
+- PowerShell script block logging.
+- PowerShell transcription logging.
+- Guest account disablement through a security template.
+- Account lockout hardening through a security template.
+- Local administrator restrictions and review notes.
+
+This feature is opt-in. Review every setting before applying it beyond a disposable lab.
+
+## Blue Team Mode
+
+Blue Team Mode is an optional orchestration feature that prepares a monitoring and hardening baseline in one flow.
+
+Run it directly:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -EnableBlueTeamMode -SecurityMonitoringCollector dc01.lab.local
+```
+
+Blue Team Mode calls or prepares:
+
+- Audit Policy GPO.
+- Security monitoring baseline.
+- Sysmon deployment stub.
+- Windows Event Forwarding preparation.
+- CIS-style hardening.
+- Windows LAPS prerequisites and policy configuration.
+
+Blue Team Mode is modular and opt-in. It reuses the same underlying modules instead of duplicating logic.
+
+## HTML Security Dashboard
+
+Active Directory Auto Deployment Lab can generate an HTML Security Dashboard that summarizes the current lab state.
 
 Run it directly:
 
@@ -300,7 +357,7 @@ Run it directly:
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -GenerateHtmlReport
 ```
 
-Or open the menu and choose `Generate HTML Report`:
+Or open the menu and choose `Generate HTML Security Report`:
 
 ```powershell
 .\main.ps1 -Menu
@@ -314,6 +371,7 @@ C:\AD_Setup\Reports\ADLab_Report.html
 
 The report includes:
 
+- Project name and creator credit.
 - Domain information.
 - OU count.
 - User count.
@@ -322,10 +380,27 @@ The report includes:
 - Department shares summary.
 - Windows LAPS status summary.
 - Security monitoring summary.
+- CIS hardening status.
+- Blue Team Mode status.
 - Existing health check results from `C:\AD_Setup\Reports\final-report.txt`.
 - Errors and warnings from the log file.
 
 The HTML report reads current lab state and existing report/log files. It does not install AD DS, promote the server, create shares, download Sysmon, or extend schema by itself.
+
+## GitHub Actions Validation
+
+The project includes a GitHub Actions workflow:
+
+```text
+.github/workflows/powershell-validation.yml
+```
+
+The workflow performs:
+
+- PowerShell parser syntax validation for `.ps1` and `.psm1` files.
+- Module import-only validation.
+
+The workflow does not install AD DS, promote a Domain Controller, create GPOs, create shares, download Sysmon, extend schema, or run setup functions.
 
 ## Default OUs
 
@@ -381,4 +456,5 @@ The script prints an execution plan before making changes and asks for `YES` bef
 - Do not hardcode real passwords.
 - Do not use production domain names unless you fully understand DNS consequences.
 - Review the sample GPOs before enabling them broadly.
+- Advanced features such as CIS-style hardening, Blue Team Mode, Windows LAPS, security monitoring, and HTML dashboard generation are opt-in.
 - Test with snapshots/checkpoints in a disposable lab VM.

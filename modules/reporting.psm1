@@ -279,6 +279,99 @@ function Get-ADLabReportSecurityMonitoringSummary {
     }
 }
 
+function Get-ADLabReportCISHardeningSummary {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.Generic.List[string]]$Warnings,
+        [Parameter(Mandatory)]
+        [string]$LogPath
+    )
+
+    try {
+        $gpoStatus = 'Unavailable'
+        $configuredAreas = @()
+
+        try {
+            Import-Module GroupPolicy -ErrorAction Stop
+            $gpo = Get-GPO -Name 'LAB - CIS-Style Security Hardening' -ErrorAction SilentlyContinue
+            if ($gpo) {
+                $gpoStatus = 'Found'
+                $configuredAreas = @(
+                    'SMB signing hardening',
+                    'NTLM restriction notes/settings',
+                    'Windows Defender baseline',
+                    'Firewall baseline',
+                    'PowerShell logging',
+                    'Guest account disabled through security template',
+                    'Account lockout hardening through security template',
+                    'Local admin restrictions through policy/template'
+                )
+            } else {
+                $gpoStatus = 'Not found'
+            }
+        } catch {
+            $gpoStatus = "GPO check unavailable: $($_.Exception.Message)"
+        }
+
+        if ($configuredAreas.Count -eq 0) {
+            $configuredAreas = @('CIS-style hardening has not been detected yet.')
+        }
+
+        return @(
+            [pscustomobject]@{ Item = 'Hardening GPO'; Status = $gpoStatus },
+            [pscustomobject]@{ Item = 'Configured Areas'; Status = ($configuredAreas -join '; ') }
+        )
+    } catch {
+        Add-ADLabReportWarning -Warnings $Warnings -Message "CIS hardening summary unavailable: $($_.Exception.Message)" -LogPath $LogPath
+        return @()
+    }
+}
+
+function Get-ADLabReportBlueTeamModeSummary {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [System.Collections.Generic.List[string]]$Warnings,
+        [Parameter(Mandatory)]
+        [string]$LogPath
+    )
+
+    try {
+        $expectedGpos = @(
+            'LAB - Security Monitoring Audit Policy',
+            'LAB - Windows Event Forwarding Preparation',
+            'LAB - CIS-Style Security Hardening',
+            'LAB - Windows LAPS Policy'
+        )
+
+        $rows = New-Object System.Collections.Generic.List[object]
+
+        try {
+            Import-Module GroupPolicy -ErrorAction Stop
+            foreach ($gpoName in $expectedGpos) {
+                $rows.Add([pscustomobject]@{
+                    Component = $gpoName
+                    Status = if (Get-GPO -Name $gpoName -ErrorAction SilentlyContinue) { 'Detected' } else { 'Not detected' }
+                })
+            }
+        } catch {
+            Add-ADLabReportWarning -Warnings $Warnings -Message "Blue Team Mode GPO checks unavailable: $($_.Exception.Message)" -LogPath $LogPath
+            foreach ($gpoName in $expectedGpos) {
+                $rows.Add([pscustomobject]@{
+                    Component = $gpoName
+                    Status = 'Unavailable'
+                })
+            }
+        }
+
+        return $rows
+    } catch {
+        Add-ADLabReportWarning -Warnings $Warnings -Message "Blue Team Mode summary unavailable: $($_.Exception.Message)" -LogPath $LogPath
+        return @()
+    }
+}
+
 function Get-ADLabReportHealthSummary {
     [CmdletBinding()]
     param(
@@ -346,7 +439,7 @@ function New-ADLabHtmlReport {
     $warnings = [System.Collections.Generic.List[string]]::new()
 
     try {
-        Write-ADSetupLog -Message 'Starting HTML Health and Security Report generation.' -Level Info -LogPath $LogPath
+        Write-ADSetupLog -Message 'Starting HTML Security Dashboard generation.' -Level Info -LogPath $LogPath
 
         $reportFolder = Split-Path -Parent $ReportPath
         if (-not (Test-Path -LiteralPath $reportFolder)) {
@@ -362,6 +455,8 @@ function New-ADLabHtmlReport {
         $shares = Get-ADLabReportShareSummary -ShareRootPath $DepartmentShareRootPath -Warnings $warnings -LogPath $LogPath
         $laps = Get-ADLabReportLapsSummary -Warnings $warnings -LogPath $LogPath
         $securityMonitoring = Get-ADLabReportSecurityMonitoringSummary -SysmonStubPath $SysmonStubPath -Warnings $warnings -LogPath $LogPath
+        $cisHardening = Get-ADLabReportCISHardeningSummary -Warnings $warnings -LogPath $LogPath
+        $blueTeamMode = Get-ADLabReportBlueTeamModeSummary -Warnings $warnings -LogPath $LogPath
         $health = Get-ADLabReportHealthSummary -TextReportPath $TextHealthReportPath -Warnings $warnings -LogPath $LogPath
         $logWarnings = Get-ADLabReportLogWarnings -LogPath $LogPath
 
@@ -371,6 +466,8 @@ function New-ADLabHtmlReport {
         $shareTable = New-ADLabHtmlTable -Rows $shares -Columns @('Share', 'Status', 'Path', 'FolderExists')
         $lapsTable = New-ADLabHtmlTable -Rows $laps -Columns @('Item', 'Status')
         $securityMonitoringTable = New-ADLabHtmlTable -Rows $securityMonitoring -Columns @('Item', 'Status')
+        $cisHardeningTable = New-ADLabHtmlTable -Rows $cisHardening -Columns @('Item', 'Status')
+        $blueTeamModeTable = New-ADLabHtmlTable -Rows $blueTeamMode -Columns @('Component', 'Status')
         $logWarningTable = New-ADLabHtmlTable -Rows $logWarnings -Columns @('Type', 'Message')
         $runtimeWarningsTable = New-ADLabHtmlTable -Rows @($warnings | ForEach-Object { [pscustomobject]@{ Type = 'Runtime Warning'; Message = $_ } }) -Columns @('Type', 'Message')
 
@@ -381,6 +478,8 @@ function New-ADLabHtmlReport {
             (New-ADLabReportSection -Title 'Department Shares Summary' -Body $shareTable),
             (New-ADLabReportSection -Title 'LAPS Status Summary' -Body $lapsTable),
             (New-ADLabReportSection -Title 'Security Monitoring Summary' -Body $securityMonitoringTable),
+            (New-ADLabReportSection -Title 'CIS Hardening Status' -Body $cisHardeningTable),
+            (New-ADLabReportSection -Title 'Blue Team Mode Status' -Body $blueTeamModeTable),
             (New-ADLabReportSection -Title 'Health Check Results' -Body $health),
             (New-ADLabReportSection -Title 'Errors and Warnings' -Body ($runtimeWarningsTable + $logWarningTable))
         )
@@ -488,10 +587,10 @@ function New-ADLabHtmlReport {
 </html>
 "@
 
-        if ($PSCmdlet.ShouldProcess($ReportPath, 'Write HTML Health and Security Report')) {
+        if ($PSCmdlet.ShouldProcess($ReportPath, 'Write HTML Security Dashboard')) {
             Set-Content -Path $ReportPath -Value $html -Encoding UTF8 -ErrorAction Stop
             Write-Host "[REPORT] HTML report written: $ReportPath" -ForegroundColor Cyan
-            Write-ADSetupLog -Message "HTML Health and Security Report written to $ReportPath." -Level Success -LogPath $LogPath
+            Write-ADSetupLog -Message "HTML Security Dashboard written to $ReportPath." -Level Success -LogPath $LogPath
         }
     } catch {
         Write-ADSetupLog -Message "HTML report generation failed. $($_.Exception.Message)" -Level Error -LogPath $LogPath

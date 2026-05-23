@@ -1,0 +1,64 @@
+name: PowerShell Validation
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  validate:
+    name: Parser and Module Import Validation
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: PowerShell parser syntax validation
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -Include *.ps1,*.psm1
+          $failed = $false
+
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) > $null
+
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "SYNTAX ERROR: $($file.FullName)"
+              foreach ($parseError in $errors) {
+                Write-Host "  $($parseError.Message)"
+              }
+            } else {
+              Write-Host "SYNTAX OK: $($file.FullName)"
+            }
+          }
+
+          if ($failed) {
+            exit 1
+          }
+
+      - name: Module import-only validation
+        shell: pwsh
+        run: |
+          $moduleFiles = Get-ChildItem -Path .\modules -Filter *.psm1
+          $failed = $false
+
+          foreach ($moduleFile in $moduleFiles) {
+            try {
+              Import-Module $moduleFile.FullName -Force -ErrorAction Stop
+              Write-Host "IMPORT OK: $($moduleFile.FullName)"
+            } catch {
+              $failed = $true
+              Write-Host "IMPORT ERROR: $($moduleFile.FullName)"
+              Write-Host "  $($_.Exception.Message)"
+            }
+          }
+
+          if ($failed) {
+            exit 1
+          }
