@@ -232,7 +232,7 @@ try {
             -LogPath $script:ADSetupConfig.LogPath `
             -WhatIf:$WhatIfPreference
 
-        Configure-ADLabLAPS `
+        Set-ADLabLAPSConfiguration `
             -DomainName $DomainName `
             -NetBIOSName $NetBIOSName `
             -ManagedOU $targetLapsOu `

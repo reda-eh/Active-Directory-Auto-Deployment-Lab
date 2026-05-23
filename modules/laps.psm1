@@ -155,7 +155,7 @@ function Install-ADLabWindowsLAPS {
     }
 }
 
-function Configure-ADLabLAPS {
+function Set-ADLabLAPSConfiguration {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [Parameter(Mandatory)]
@@ -289,4 +289,4 @@ function Configure-ADLabLAPS {
     }
 }
 
-Export-ModuleMember -Function Install-ADLabWindowsLAPS, Configure-ADLabLAPS
+Export-ModuleMember -Function Install-ADLabWindowsLAPS, Set-ADLabLAPSConfiguration
