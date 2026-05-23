@@ -13,6 +13,8 @@ Active Directory Auto Deployment Lab is designed for lab environments. Review ev
 - `modules/create_groups.psm1` - creates default security groups safely.
 - `modules/create_users.psm1` - imports users from CSV and adds group membership.
 - `modules/gpo_setup.psm1` - creates and links basic lab GPO examples.
+- `modules/access_control.psm1` - creates department share folders, hidden SMB shares, and access rules.
+- `modules/security_monitoring.psm1` - prepares audit policy, Windows Event Forwarding, and Sysmon deployment stubs.
 - `modules/checks.psm1` - admin checks, AD detection, password validation, logging, and health report.
 - `data/users.csv` - sample user import file.
 
@@ -31,6 +33,8 @@ Active Directory Auto Deployment Lab can:
 - Optionally force password change at first login.
 - Optionally create imported users as disabled.
 - Apply starter lab GPOs.
+- Configure Department-Based Access Control with department folders, hidden SMB shares, NTFS permissions, and SMB permissions.
+- Configure optional security monitoring with an audit policy GPO, Windows Event Forwarding preparation, and a Sysmon deployment stub.
 - Run health checks and generate a report.
 - Log actions to `C:\AD_Setup\Logs\setup.log`.
 - Write the final report to `C:\AD_Setup\Reports\final-report.txt`.
@@ -109,6 +113,118 @@ Notes:
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -SkipPromotion
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -SkipGpo
 .\main.ps1 -DomainName lab.local -RunHealthCheckOnly
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureDepartmentAccessControl
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureSecurityMonitoring -SecurityMonitoringCollector dc01.lab.local
+.\main.ps1 -Menu
+```
+
+## Department-Based Access Control
+
+Active Directory Auto Deployment Lab can create a lab file-share structure for department-based access control.
+
+Run it directly:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureDepartmentAccessControl
+```
+
+Or open the menu and choose `Configure Department Access Control`:
+
+```powershell
+.\main.ps1 -Menu
+```
+
+The feature creates this folder structure:
+
+```text
+C:\AD_Lab_Shares\HR
+C:\AD_Lab_Shares\Finance
+C:\AD_Lab_Shares\IT
+C:\AD_Lab_Shares\Public
+```
+
+It creates these hidden SMB shares:
+
+```text
+HR$
+Finance$
+IT$
+Public$
+```
+
+It applies these lab access rules:
+
+- `HR_Users` - Modify on `HR`
+- `Finance_Users` - Modify on `Finance`
+- `IT_Admins` - Modify on `IT`
+- `Domain Admins` - Full Control on all folders
+- `Domain Users` - Read on `Public`
+
+The share and permission setup is safe to re-run:
+
+- Existing folders are reused.
+- Existing shares are reused.
+- Existing matching NTFS permissions are skipped.
+- Existing matching SMB share permissions are skipped.
+- Mismatched existing share paths are logged as warnings.
+
+## Security Monitoring
+
+Active Directory Auto Deployment Lab can prepare a lab security monitoring baseline with three optional parts:
+
+- Audit Policy GPO for Windows security auditing.
+- Windows Event Forwarding preparation for source-initiated subscriptions.
+- Sysmon deployment stub for user-provided Sysmon files.
+
+Run it directly:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureSecurityMonitoring -SecurityMonitoringCollector dc01.lab.local
+```
+
+Or open the menu and choose `Configure Security Monitoring`:
+
+```powershell
+.\main.ps1 -Menu
+```
+
+The audit policy GPO prepares settings for:
+
+- Logon success and failure.
+- Account logon success and failure.
+- Account management success and failure.
+- Directory service changes.
+- Process creation auditing.
+- Process creation command-line logging.
+- PowerShell script block logging.
+- PowerShell module logging.
+- PowerShell transcription.
+
+Windows Event Forwarding preparation includes:
+
+- WinRM service policy settings for domain clients.
+- Source-initiated subscription manager policy pointing to the collector FQDN.
+- A `WEF_Event_Log_Readers` helper group.
+- Membership handling for the Builtin `Event Log Readers` group where applicable.
+- A policy note reminding you to run `wecutil qc` and create reviewed subscriptions on the collector.
+
+Sysmon support is intentionally a deployment stub only. The project does not download Sysmon, embed Sysmon, or include third-party Sysmon configurations.
+
+Place your reviewed files here after running the feature:
+
+```text
+C:\AD_Setup\SecurityMonitoring\Sysmon\Sysmon.exe
+C:\AD_Setup\SecurityMonitoring\Sysmon\sysmon-config.xml
+```
+
+Security monitoring architecture:
+
+```text
+Domain Clients
+  -> Audit Policy GPO enables Windows event generation
+  -> WEF policy points clients to the collector
+  -> Sysmon stub can be adapted for reviewed lab deployment
+  -> Collector receives forwarded events for analysis
 ```
 
 ## Default OUs

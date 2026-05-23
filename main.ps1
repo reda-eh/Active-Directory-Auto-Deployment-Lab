@@ -7,7 +7,11 @@ param(
     [switch]$DisableImportedUsers,
     [switch]$SkipPromotion,
     [switch]$SkipGpo,
-    [switch]$RunHealthCheckOnly
+    [switch]$RunHealthCheckOnly,
+    [switch]$ConfigureDepartmentAccessControl,
+    [switch]$ConfigureSecurityMonitoring,
+    [string]$SecurityMonitoringCollector,
+    [switch]$Menu
 )
 
 Set-StrictMode -Version Latest
@@ -21,6 +25,8 @@ Import-Module "$PSScriptRoot\modules\create_ous.psm1" -Force
 Import-Module "$PSScriptRoot\modules\create_groups.psm1" -Force
 Import-Module "$PSScriptRoot\modules\create_users.psm1" -Force
 Import-Module "$PSScriptRoot\modules\gpo_setup.psm1" -Force
+Import-Module "$PSScriptRoot\modules\access_control.psm1" -Force
+Import-Module "$PSScriptRoot\modules\security_monitoring.psm1" -Force
 
 function Write-Status {
     param(
@@ -55,6 +61,20 @@ function Read-RequiredValue {
     }
 
     return $CurrentValue
+}
+
+function Show-ADAutoDeploymentMenu {
+    Write-Host ''
+    Write-Host 'Active Directory Auto Deployment Lab' -ForegroundColor Magenta
+    Write-Host '------------------------------------' -ForegroundColor Magenta
+    Write-Host '1. Run full lab setup'
+    Write-Host '2. Run health check only'
+    Write-Host '3. Configure Department Access Control'
+    Write-Host '4. Configure Security Monitoring'
+    Write-Host '5. Exit'
+    Write-Host ''
+
+    return Read-Host 'Select an option'
 }
 
 function Show-ExecutionPlan {
@@ -96,14 +116,27 @@ try {
 
     Assert-RunningAsAdministrator
 
+    if ($Menu) {
+        switch (Show-ADAutoDeploymentMenu) {
+            '1' { }
+            '2' { $RunHealthCheckOnly = $true }
+            '3' { $ConfigureDepartmentAccessControl = $true }
+            '4' { $ConfigureSecurityMonitoring = $true }
+            '5' {
+                Write-Status 'Menu exit selected.' -Level Warning
+                return
+            }
+            default {
+                Write-Status 'Invalid menu option selected.' -Level Warning
+                return
+            }
+        }
+    }
+
     $UserCsvPath = if ([string]::IsNullOrWhiteSpace($UserCsvPath)) {
         $script:ADSetupConfig.UserCsvPath
     } else {
         $UserCsvPath
-    }
-
-    if (-not (Test-Path -LiteralPath $UserCsvPath)) {
-        throw "CSV file not found: $UserCsvPath"
     }
 
     $isDc = Test-IsDomainController
@@ -125,6 +158,54 @@ try {
 
     if (-not (Test-NetBIOSName -NetBIOSName $NetBIOSName)) {
         throw "Invalid NetBIOS name: $NetBIOSName. Use 1-15 letters, numbers, or hyphens."
+    }
+
+    if ($ConfigureDepartmentAccessControl) {
+        New-ADLabDepartmentShares `
+            -DomainName $DomainName `
+            -NetBIOSName $NetBIOSName `
+            -RootPath $script:ADSetupConfig.DepartmentShareRootPath `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Write-Status 'Department-Based Access Control configuration completed.' -Level Success
+        return
+    }
+
+    if ($ConfigureSecurityMonitoring) {
+        $collectorFqdn = if ([string]::IsNullOrWhiteSpace($SecurityMonitoringCollector)) {
+            Read-Host 'Enter Windows Event Forwarding collector FQDN, example dc01.lab.local'
+        } else {
+            $SecurityMonitoringCollector
+        }
+
+        if ([string]::IsNullOrWhiteSpace($collectorFqdn)) {
+            throw 'Windows Event Forwarding collector FQDN is required for security monitoring configuration.'
+        }
+
+        New-ADLabAuditPolicyGPO `
+            -DomainName $DomainName `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Enable-ADLabWindowsEventForwarding `
+            -DomainName $DomainName `
+            -NetBIOSName $NetBIOSName `
+            -CollectorFqdn $collectorFqdn `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        New-ADLabSysmonDeploymentStub `
+            -StubPath $script:ADSetupConfig.SysmonStubPath `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Write-Status 'Security monitoring configuration completed.' -Level Success
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $UserCsvPath)) {
+        throw "CSV file not found: $UserCsvPath"
     }
 
     $usersEnabled = -not $DisableImportedUsers
