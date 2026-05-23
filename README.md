@@ -1,8 +1,21 @@
-# Active Directory Auto Deployment Lab
+# Enterprise Active Directory Automation & Security Lab
+
+**Creator:** Rida Elhammioui  
+**Project:** Enterprise Active Directory Automation & Security Lab
 
 PowerShell-only automation project for building a Windows Server Active Directory lab from a clean machine to a basic domain with DNS, OUs, groups, users, starter GPOs, logs, and a final health report.
 
 Active Directory Auto Deployment Lab is designed for lab environments. Review every setting before using it anywhere else.
+
+## About the Author
+
+Created by **Rida Elhammioui** as a professional lab automation project for Active Directory deployment, administration, security configuration, monitoring preparation, and reporting.
+
+## Repository
+
+GitHub repository: `https://github.com/<your-username>/<your-repository>`
+
+Replace the placeholder with the final public or private repository URL when the project is published.
 
 ## Files
 
@@ -16,6 +29,7 @@ Active Directory Auto Deployment Lab is designed for lab environments. Review ev
 - `modules/access_control.psm1` - creates department share folders, hidden SMB shares, and access rules.
 - `modules/security_monitoring.psm1` - prepares audit policy, Windows Event Forwarding, and Sysmon deployment stubs.
 - `modules/laps.psm1` - prepares optional Windows LAPS schema checks, policy settings, and delegation.
+- `modules/reporting.psm1` - generates an optional HTML Health and Security Report.
 - `modules/checks.psm1` - admin checks, AD detection, password validation, logging, and health report.
 - `data/users.csv` - sample user import file.
 
@@ -37,9 +51,11 @@ Active Directory Auto Deployment Lab can:
 - Configure Department-Based Access Control with department folders, hidden SMB shares, NTFS permissions, and SMB permissions.
 - Configure optional security monitoring with an audit policy GPO, Windows Event Forwarding preparation, and a Sysmon deployment stub.
 - Configure optional Windows LAPS policy settings and delegation for lab-managed computers.
+- Generate an optional HTML Health and Security Report.
 - Run health checks and generate a report.
 - Log actions to `C:\AD_Setup\Logs\setup.log`.
 - Write the final report to `C:\AD_Setup\Reports\final-report.txt`.
+- Write the optional HTML report to `C:\AD_Setup\Reports\ADLab_Report.html`.
 
 ## Requirements
 
@@ -119,6 +135,7 @@ Notes:
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureSecurityMonitoring -SecurityMonitoringCollector dc01.lab.local
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS -LAPSManagedOU Computers
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -GenerateHtmlReport
 .\main.ps1 -Menu
 ```
 
@@ -272,6 +289,43 @@ Schema extension is intentionally not automatic unless requested:
 ```
 
 Review schema extension requirements before using `-ExtendLAPSSchema`. In a lab, use VM snapshots/checkpoints before changing the schema.
+
+## HTML Health and Security Report
+
+Active Directory Auto Deployment Lab can generate an HTML report that summarizes the current lab state.
+
+Run it directly:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -GenerateHtmlReport
+```
+
+Or open the menu and choose `Generate HTML Report`:
+
+```powershell
+.\main.ps1 -Menu
+```
+
+The HTML report is saved to:
+
+```text
+C:\AD_Setup\Reports\ADLab_Report.html
+```
+
+The report includes:
+
+- Domain information.
+- OU count.
+- User count.
+- Group count.
+- GPO summary.
+- Department shares summary.
+- Windows LAPS status summary.
+- Security monitoring summary.
+- Existing health check results from `C:\AD_Setup\Reports\final-report.txt`.
+- Errors and warnings from the log file.
+
+The HTML report reads current lab state and existing report/log files. It does not install AD DS, promote the server, create shares, download Sysmon, or extend schema by itself.
 
 ## Default OUs
 

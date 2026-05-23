@@ -1,3 +1,7 @@
+# Enterprise Active Directory Automation & Security Lab
+# Creator: Rida Elhammioui
+# Purpose: Lab-focused Active Directory automation, security hardening, monitoring, and reporting.
+
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string]$DomainName,
@@ -14,6 +18,7 @@ param(
     [switch]$ConfigureWindowsLAPS,
     [switch]$ExtendLAPSSchema,
     [string]$LAPSManagedOU,
+    [switch]$GenerateHtmlReport,
     [switch]$Menu
 )
 
@@ -31,6 +36,7 @@ Import-Module "$PSScriptRoot\modules\gpo_setup.psm1" -Force
 Import-Module "$PSScriptRoot\modules\access_control.psm1" -Force
 Import-Module "$PSScriptRoot\modules\security_monitoring.psm1" -Force
 Import-Module "$PSScriptRoot\modules\laps.psm1" -Force
+Import-Module "$PSScriptRoot\modules\reporting.psm1" -Force
 
 function Write-Status {
     param(
@@ -69,14 +75,16 @@ function Read-RequiredValue {
 
 function Show-ADAutoDeploymentMenu {
     Write-Host ''
-    Write-Host 'Active Directory Auto Deployment Lab' -ForegroundColor Magenta
-    Write-Host '------------------------------------' -ForegroundColor Magenta
+    Write-Host 'Enterprise Active Directory Automation & Security Lab' -ForegroundColor Magenta
+    Write-Host 'Creator: Rida Elhammioui' -ForegroundColor DarkCyan
+    Write-Host '-----------------------------------------------------' -ForegroundColor Magenta
     Write-Host '1. Run full lab setup'
     Write-Host '2. Run health check only'
     Write-Host '3. Configure Department Access Control'
     Write-Host '4. Configure Security Monitoring'
     Write-Host '5. Configure Windows LAPS'
-    Write-Host '6. Exit'
+    Write-Host '6. Generate HTML Report'
+    Write-Host '7. Exit'
     Write-Host ''
 
     return Read-Host 'Select an option'
@@ -97,8 +105,9 @@ function Show-ExecutionPlan {
     )
 
     Write-Host ''
-    Write-Host 'Active Directory Auto Deployment Lab execution plan' -ForegroundColor Magenta
-    Write-Host '-----------------------------------' -ForegroundColor Magenta
+    Write-Host 'Enterprise Active Directory Automation & Security Lab execution plan' -ForegroundColor Magenta
+    Write-Host 'Creator: Rida Elhammioui' -ForegroundColor DarkCyan
+    Write-Host '----------------------------------------------------' -ForegroundColor Magenta
     Write-Host "Domain/FQDN:                  $TargetDomain"
     Write-Host "NetBIOS name:                 $TargetNetBIOS"
     Write-Host "Install AD DS/DNS features:    Yes, if missing"
@@ -128,7 +137,8 @@ try {
             '3' { $ConfigureDepartmentAccessControl = $true }
             '4' { $ConfigureSecurityMonitoring = $true }
             '5' { $ConfigureWindowsLAPS = $true }
-            '6' {
+            '6' { $GenerateHtmlReport = $true }
+            '7' {
                 Write-Status 'Menu exit selected.' -Level Warning
                 return
             }
@@ -230,6 +240,20 @@ try {
             -WhatIf:$WhatIfPreference
 
         Write-Status 'Windows LAPS configuration completed.' -Level Success
+        return
+    }
+
+    if ($GenerateHtmlReport) {
+        New-ADLabHtmlReport `
+            -DomainName $DomainName `
+            -ReportPath $script:ADSetupConfig.HtmlReportPath `
+            -TextHealthReportPath $script:ADSetupConfig.ReportPath `
+            -DepartmentShareRootPath $script:ADSetupConfig.DepartmentShareRootPath `
+            -SysmonStubPath $script:ADSetupConfig.SysmonStubPath `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Write-Status 'HTML Health and Security Report generation completed.' -Level Success
         return
     }
 

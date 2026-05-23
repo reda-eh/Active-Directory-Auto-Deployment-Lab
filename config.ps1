@@ -5,6 +5,7 @@ $script:ADSetupConfig = @{
     RootPath = 'C:\AD_Setup'
     LogPath = 'C:\AD_Setup\Logs\setup.log'
     ReportPath = 'C:\AD_Setup\Reports\final-report.txt'
+    HtmlReportPath = 'C:\AD_Setup\Reports\ADLab_Report.html'
     UserCsvPath = Join-Path $PSScriptRoot 'data\users.csv'
     DepartmentShareRootPath = 'C:\AD_Lab_Shares'
     SysmonStubPath = 'C:\AD_Setup\SecurityMonitoring\Sysmon'
