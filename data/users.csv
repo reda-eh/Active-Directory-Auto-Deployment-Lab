@@ -1,0 +1,6 @@
+FirstName,LastName,Username,Password,OU,Groups,Department,Title
+Alice,Admin,aadmin,LabP@ssw0rd!01,Admins,IT_Admins;Remote_Desktop_Users,IT,System Administrator
+Henry,Helpdesk,hhelpdesk,LabP@ssw0rd!02,IT,Helpdesk;Remote_Desktop_Users,IT,Helpdesk Technician
+Irene,IT,iituser,LabP@ssw0rd!03,IT,IT_Admins,IT,IT Analyst
+Hannah,Human,hhruser,LabP@ssw0rd!04,HR,HR_Users,HR,HR Specialist
+Frank,Finance,ffinance,LabP@ssw0rd!05,Finance,Finance_Users,Finance,Accountant
