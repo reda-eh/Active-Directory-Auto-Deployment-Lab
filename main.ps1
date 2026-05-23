@@ -11,6 +11,9 @@ param(
     [switch]$ConfigureDepartmentAccessControl,
     [switch]$ConfigureSecurityMonitoring,
     [string]$SecurityMonitoringCollector,
+    [switch]$ConfigureWindowsLAPS,
+    [switch]$ExtendLAPSSchema,
+    [string]$LAPSManagedOU,
     [switch]$Menu
 )
 
@@ -27,6 +30,7 @@ Import-Module "$PSScriptRoot\modules\create_users.psm1" -Force
 Import-Module "$PSScriptRoot\modules\gpo_setup.psm1" -Force
 Import-Module "$PSScriptRoot\modules\access_control.psm1" -Force
 Import-Module "$PSScriptRoot\modules\security_monitoring.psm1" -Force
+Import-Module "$PSScriptRoot\modules\laps.psm1" -Force
 
 function Write-Status {
     param(
@@ -71,7 +75,8 @@ function Show-ADAutoDeploymentMenu {
     Write-Host '2. Run health check only'
     Write-Host '3. Configure Department Access Control'
     Write-Host '4. Configure Security Monitoring'
-    Write-Host '5. Exit'
+    Write-Host '5. Configure Windows LAPS'
+    Write-Host '6. Exit'
     Write-Host ''
 
     return Read-Host 'Select an option'
@@ -122,7 +127,8 @@ try {
             '2' { $RunHealthCheckOnly = $true }
             '3' { $ConfigureDepartmentAccessControl = $true }
             '4' { $ConfigureSecurityMonitoring = $true }
-            '5' {
+            '5' { $ConfigureWindowsLAPS = $true }
+            '6' {
                 Write-Status 'Menu exit selected.' -Level Warning
                 return
             }
@@ -201,6 +207,29 @@ try {
             -WhatIf:$WhatIfPreference
 
         Write-Status 'Security monitoring configuration completed.' -Level Success
+        return
+    }
+
+    if ($ConfigureWindowsLAPS) {
+        $targetLapsOu = if ([string]::IsNullOrWhiteSpace($LAPSManagedOU)) {
+            $script:ADSetupConfig.LAPSManagedOU
+        } else {
+            $LAPSManagedOU
+        }
+
+        Install-ADLabWindowsLAPS `
+            -ExtendSchema:$ExtendLAPSSchema `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Configure-ADLabLAPS `
+            -DomainName $DomainName `
+            -NetBIOSName $NetBIOSName `
+            -ManagedOU $targetLapsOu `
+            -LogPath $script:ADSetupConfig.LogPath `
+            -WhatIf:$WhatIfPreference
+
+        Write-Status 'Windows LAPS configuration completed.' -Level Success
         return
     }
 

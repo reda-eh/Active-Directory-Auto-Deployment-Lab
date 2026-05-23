@@ -15,6 +15,7 @@ Active Directory Auto Deployment Lab is designed for lab environments. Review ev
 - `modules/gpo_setup.psm1` - creates and links basic lab GPO examples.
 - `modules/access_control.psm1` - creates department share folders, hidden SMB shares, and access rules.
 - `modules/security_monitoring.psm1` - prepares audit policy, Windows Event Forwarding, and Sysmon deployment stubs.
+- `modules/laps.psm1` - prepares optional Windows LAPS schema checks, policy settings, and delegation.
 - `modules/checks.psm1` - admin checks, AD detection, password validation, logging, and health report.
 - `data/users.csv` - sample user import file.
 
@@ -35,6 +36,7 @@ Active Directory Auto Deployment Lab can:
 - Apply starter lab GPOs.
 - Configure Department-Based Access Control with department folders, hidden SMB shares, NTFS permissions, and SMB permissions.
 - Configure optional security monitoring with an audit policy GPO, Windows Event Forwarding preparation, and a Sysmon deployment stub.
+- Configure optional Windows LAPS policy settings and delegation for lab-managed computers.
 - Run health checks and generate a report.
 - Log actions to `C:\AD_Setup\Logs\setup.log`.
 - Write the final report to `C:\AD_Setup\Reports\final-report.txt`.
@@ -115,6 +117,8 @@ Notes:
 .\main.ps1 -DomainName lab.local -RunHealthCheckOnly
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureDepartmentAccessControl
 .\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureSecurityMonitoring -SecurityMonitoringCollector dc01.lab.local
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS -LAPSManagedOU Computers
 .\main.ps1 -Menu
 ```
 
@@ -226,6 +230,48 @@ Domain Clients
   -> Sysmon stub can be adapted for reviewed lab deployment
   -> Collector receives forwarded events for analysis
 ```
+
+## Windows LAPS
+
+Active Directory Auto Deployment Lab can prepare optional Windows LAPS settings for lab-managed computers.
+
+Run it directly:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS
+```
+
+Choose a managed OU:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS -LAPSManagedOU Computers
+```
+
+Or open the menu and choose `Configure Windows LAPS`:
+
+```powershell
+.\main.ps1 -Menu
+```
+
+The Windows LAPS module can:
+
+- Check whether the Windows LAPS PowerShell module is available.
+- Check whether Windows LAPS schema attributes exist.
+- Optionally call the Windows LAPS schema extension cmdlet when explicitly requested.
+- Create or reuse a `LAB - Windows LAPS Policy` GPO.
+- Configure Windows LAPS policy registry settings in the GPO.
+- Link the GPO to the managed OU when it exists.
+- Fall back to the domain root with a warning if the managed OU is missing.
+- Delegate computer self-permissions where the Windows LAPS cmdlets are available.
+- Delegate read and reset password permissions to `Domain Admins`.
+
+Schema extension is intentionally not automatic unless requested:
+
+```powershell
+.\main.ps1 -DomainName lab.local -NetBIOSName LAB -ConfigureWindowsLAPS -ExtendLAPSSchema
+```
+
+Review schema extension requirements before using `-ExtendLAPSSchema`. In a lab, use VM snapshots/checkpoints before changing the schema.
 
 ## Default OUs
 
